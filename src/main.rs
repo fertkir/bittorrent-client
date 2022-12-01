@@ -2,9 +2,10 @@ use std::fs::File;
 use std::io::Read;
 use std::iter::{Flatten, Map};
 use http::Request;
-use serde_derive::Deserialize;
+use serde_derive::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::Bytes;
+use sha1::{Sha1, Digest};
 use url::Url;
 use uuid::Uuid;
 
@@ -15,7 +16,7 @@ struct Torrent {
 }
 
 #[serde_as]
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 struct Info {
     #[serde_as(as = "Bytes")]
     pieces: Vec<u8>,
@@ -29,21 +30,28 @@ struct Info {
 struct FlatTorrent {
     announce: String,
     info_hash: [u8; 20],
-    piece_hashes: Vec<[u8; 20]>,
+    // todo should use Vec<[u8; 20]> below:
+    piece_hashes: Vec<Vec<u8>>,
     piece_length: u32,
     length: u32,
-    name: String
+    name: String,
 }
 
 fn flatten(torrent: Torrent) -> FlatTorrent {
     FlatTorrent {
         announce: torrent.announce,
-        info_hash: [],
-        piece_hashes: ,
+        info_hash: to_sha1(&torrent.info),
+        piece_hashes: torrent.info.pieces.chunks(20).map(|s| s.into()).collect(),
         piece_length: torrent.info.piece_length,
         length: torrent.info.length,
         name: torrent.info.name,
     }
+}
+
+fn to_sha1(torrent_info: &Info) -> [u8; 20] {
+    let mut hasher = Sha1::new();
+    hasher.update(bt_bencode::to_vec(torrent_info).unwrap());
+    <[u8; 20]>::from(hasher.finalize())
 }
 
 fn parse_torrent(filepath: &str) -> Torrent {
@@ -65,7 +73,6 @@ fn parse_torrent(filepath: &str) -> Torrent {
 fn main() {
     let filepath = "/home/fertkir/Downloads/debian-11.5.0-amd64-netinst.iso.torrent";
     let torrent = parse_torrent(filepath);
-    println!("{:?}", torrent);
     let flat_torrent = flatten(torrent);
     println!("{:?}", flat_torrent);
     let url = Url::parse_with_params(&torrent.announce, &[
