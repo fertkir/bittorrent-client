@@ -1,13 +1,9 @@
 use std::fs::File;
 use std::io::Read;
-use std::iter::{Flatten, Map};
-use http::Request;
 use serde_derive::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::Bytes;
 use sha1::{Sha1, Digest};
-use url::Url;
-use uuid::Uuid;
 
 #[derive(Deserialize, Debug)]
 struct Torrent {
@@ -70,22 +66,23 @@ fn parse_torrent(filepath: &str) -> Torrent {
     }
 }
 
+fn query_tracker(flat_torrent: &FlatTorrent) -> String {
+    let url = flat_torrent.announce.to_string() + "?uploaded=0&downloaded=0&compact=1\
+        &info_hash=" + &urlencoding::encode_binary(&flat_torrent.info_hash)
+        + "&port=" + &PORT.to_string()
+        + "&peer_id=jfa68h4w7i8eghei8rdf"
+        + "&left=" + &flat_torrent.length.to_string();
+    println!("{}", &url);
+    reqwest::blocking::get(&url).unwrap().text().unwrap()
+}
+
+const PORT: i32 = 9876;
+
 fn main() {
     let filepath = "/home/fertkir/Downloads/debian-11.5.0-amd64-netinst.iso.torrent";
     let torrent = parse_torrent(filepath);
     let flat_torrent = flatten(torrent);
     println!("{:?}", flat_torrent);
-    let url = Url::parse_with_params(&torrent.announce, &[
-        ("info_hash", flat_torrent.info_hash),
-        ("peer_id", Uuid::new_v4().to_string()),
-        ("port", ),
-        ("uploaded", "0"),
-        ("downloaded", "0"),
-        ("compact", "1"),
-        ("left", torrent.info.length.to_string())
-    ])?;
-
-    let request = Request::builder()
-        .uri(url.as_str());
-    let response = send(request.body(()));
+    let response = query_tracker(&flat_torrent);
+    println!("{}", response)
 }
