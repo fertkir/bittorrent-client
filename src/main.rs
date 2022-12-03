@@ -16,10 +16,13 @@ fn main() {
 
     for peer in tracker_response.peers {
         let stream = match handshake(&peer, torrent.info_hash, &peer_id) {
-            Err(_) => continue,
+            Err(reason) => {
+                println!("Handshake with {} failed: {}", peer, reason);
+                continue;
+            }
             Ok(stream) => stream
         };
-        println!("Established handshake with {}", peer)
+        println!("Handshake with {} succeeded", peer)
     }
 }
 
