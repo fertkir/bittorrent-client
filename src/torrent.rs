@@ -20,11 +20,11 @@ pub struct TorrentFile {
 impl TorrentFile {
 
     pub fn new(filepath: &str) -> TorrentFile {
-        TorrentFile::parse_torrent(filepath)
+        TorrentFile::parse(filepath)
             .flatten()
     }
 
-    fn parse_torrent(filepath: &str) -> Torrent {
+    fn parse(filepath: &str) -> Torrent {
         let mut file = match File::open(filepath) {
             Ok(file) => file,
             Err(reason) => panic!("couldn't open {}: {}", filepath, reason)
