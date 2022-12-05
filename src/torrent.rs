@@ -47,17 +47,6 @@ struct Torrent {
     info: Info,
 }
 
-#[serde_as]
-#[derive(Deserialize, Serialize, Debug)]
-struct Info {
-    #[serde_as(as = "Bytes")]
-    pieces: Vec<u8>,
-    #[serde(rename = "piece length")]
-    piece_length: u32,
-    length: u32,
-    name: String,
-}
-
 impl Torrent {
     fn flatten(self) -> TorrentFile {
         TorrentFile {
@@ -69,6 +58,17 @@ impl Torrent {
             name: self.info.name,
         }
     }
+}
+
+#[serde_as]
+#[derive(Deserialize, Serialize, Debug)]
+struct Info {
+    #[serde_as(as = "Bytes")]
+    pieces: Vec<u8>,
+    #[serde(rename = "piece length")]
+    piece_length: u32,
+    length: u32,
+    name: String,
 }
 
 impl Info {
