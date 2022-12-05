@@ -17,6 +17,30 @@ pub struct TorrentFile {
     pub name: String,
 }
 
+impl TorrentFile {
+
+    pub fn new(filepath: &str) -> TorrentFile {
+        TorrentFile::parse_torrent(filepath)
+            .flatten()
+    }
+
+    fn parse_torrent(filepath: &str) -> Torrent {
+        let mut file = match File::open(filepath) {
+            Ok(file) => file,
+            Err(reason) => panic!("couldn't open {}: {}", filepath, reason)
+        };
+        let mut buffer = Vec::new();
+        match file.read_to_end(&mut buffer) {
+            Ok(_) => println!("read {}", filepath),
+            Err(reason) => panic!("couldn't read {}: {}", filepath, reason)
+        };
+        match bt_bencode::from_slice(&buffer) {
+            Ok(value) => value,
+            Err(reason) => panic!("couldn't parse .torrent: {}", reason)
+        }
+    }
+}
+
 #[derive(Deserialize, Debug)]
 struct Torrent {
     announce: String,
@@ -34,39 +58,23 @@ struct Info {
     name: String,
 }
 
-pub fn parse(filepath: &str) -> TorrentFile {
-    flatten(parse_torrent(filepath))
-}
-
-fn parse_torrent(filepath: &str) -> Torrent {
-    let mut file = match File::open(filepath) {
-        Ok(file) => file,
-        Err(reason) => panic!("couldn't open {}: {}", filepath, reason)
-    };
-    let mut buffer = Vec::new();
-    match file.read_to_end(&mut buffer) {
-        Ok(_) => println!("read {}", filepath),
-        Err(reason) => panic!("couldn't read {}: {}", filepath, reason)
-    };
-    match bt_bencode::from_slice(&buffer) {
-        Ok(value) => value,
-        Err(reason) => panic!("couldn't parse .torrent: {}", reason)
+impl Torrent {
+    fn flatten(self) -> TorrentFile {
+        TorrentFile {
+            announce: self.announce,
+            info_hash: self.info.to_sha1(),
+            piece_hashes: self.info.pieces.chunks(20).map(|s| s.into()).collect(),
+            piece_length: self.info.piece_length,
+            length: self.info.length,
+            name: self.info.name,
+        }
     }
 }
 
-fn flatten(torrent: Torrent) -> TorrentFile {
-    TorrentFile {
-        announce: torrent.announce,
-        info_hash: to_sha1(&torrent.info),
-        piece_hashes: torrent.info.pieces.chunks(20).map(|s| s.into()).collect(),
-        piece_length: torrent.info.piece_length,
-        length: torrent.info.length,
-        name: torrent.info.name,
+impl Info {
+    fn to_sha1(&self) -> [u8; 20] {
+        let mut hasher = Sha1::new();
+        hasher.update(bt_bencode::to_vec(self).unwrap());
+        <[u8; 20]>::from(hasher.finalize())
     }
-}
-
-fn to_sha1(torrent_info: &Info) -> [u8; 20] {
-    let mut hasher = Sha1::new();
-    hasher.update(bt_bencode::to_vec(torrent_info).unwrap());
-    <[u8; 20]>::from(hasher.finalize())
 }
